@@ -20,6 +20,7 @@ started = True
 # Translate each subtitle
 translated_subtitles = []
 
+
 def make_dirs():
     # Create the input folder if it doesn't exist
     os.makedirs(input_folder, exist_ok=True)
@@ -57,16 +58,20 @@ def translate_single_srt(input_file):
 def translate_and_save_batch(subtitles):
     # Construct a user message batch
 
+    message = []
+
     system_messages = [{'role': 'system', 'content': f'translate to "{target_lang}"'}]
     user_messages = [{'role': 'user', 'content': subtitle.content} for subtitle in subtitles]
 
-
     if started:
-
+        message = system_messages + user_messages
+    else:
+        message = user_messages
+        started = False
 
     completion = openai.ChatCompletion.create(
         model='gpt-3.5-turbo',
-        messages=user_messages
+        messages=message
     )
 
     for idx, subtitle in enumerate(subtitles):
