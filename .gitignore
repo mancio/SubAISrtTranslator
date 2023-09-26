@@ -1,0 +1,11 @@
+# Ignore virtual environment
+venv
+
+# Ignore sub files
+.srt
+input
+output
+
+# intellij stuff
+.idea
+SubAISrtTranslator.iml
