@@ -9,9 +9,16 @@ api_key = sys.argv[1]
 
 input_folder = "input"  # Folder containing the input .srt files
 output_folder = "output"  # Folder to save translated .srt files
-target_lang = "english"  # Target language code (e.g., "fr" for French)
-movie_name = "Fantozzi"
+target_lang = "polish"  # Target language code (e.g., "fr" for French)
 
+# Limit for the maximum tokens per API call
+MAX_TOKENS_PER_CALL = 4096
+
+# Check if the conversation just started
+started = True
+
+# Translate each subtitle
+translated_subtitles = []
 
 def make_dirs():
     # Create the input folder if it doesn't exist
@@ -25,34 +32,45 @@ def translate_single_srt(input_file):
     # Initialize the OpenAI API client with the "gpt-3.5-turbo" engine
     openai.api_key = api_key
 
+    current_tokens = 0
+    current_subtitles = []
+
     # Read the input .srt file
     with open(input_file, 'r', encoding='utf-8') as file:
         subtitles = list(srt.parse(file.read()))
 
-    # Translate each subtitle
-    translated_subtitles = []
     for subtitle in subtitles:
-        # # Translate the subtitle text using GPT-3.5 Turbo with 4K context
-        # translation = openai.Completion.create(
-        #     engine="davinci",
-        #     prompt=f"Translate the following subtitle line in {target_lang}:\n{subtitle.content}",
-        #     max_tokens=50  # Adjust the max_tokens as needed for longer subtitles
-        # )
-        #
-        # translated_text = translation.choices[0].text.strip()
-        # subtitle.content = translated_text
-        # translated_subtitles.append(subtitle)
-
         # Translate the subtitle text to English using OpenAI API
-        messages = [
-            {'role': 'system', 'content': f'translate this text to "{target_lang}"'},
-            {'role': 'user', 'content': subtitle.content}
-        ]
-        completion = openai.ChatCompletion.create(
-            model='gpt-3.5-turbo',
-            messages=messages
-        )
-        result = completion.choices[0].message.content
+        user_message = subtitle.content
+        if current_tokens + len(user_message.split()) < MAX_TOKENS_PER_CALL:
+            current_subtitles.append(subtitle)
+            current_tokens += len(user_message.split())
+        else:
+            translate_and_save_batch(current_subtitles)
+            current_subtitles = [subtitle]
+            current_tokens = len(user_message.split())
+
+    if current_subtitles:
+        translate_and_save_batch(current_subtitles)
+
+
+def translate_and_save_batch(subtitles):
+    # Construct a user message batch
+
+    system_messages = [{'role': 'system', 'content': f'translate to "{target_lang}"'}]
+    user_messages = [{'role': 'user', 'content': subtitle.content} for subtitle in subtitles]
+
+
+    if started:
+
+
+    completion = openai.ChatCompletion.create(
+        model='gpt-3.5-turbo',
+        messages=user_messages
+    )
+
+    for idx, subtitle in enumerate(subtitles):
+        result = completion.choices[idx].message.content
 
         try:
             result = json.loads(result)['choices'][0]['message']['content']
@@ -61,7 +79,8 @@ def translate_single_srt(input_file):
             pass
 
         translated_text = result.strip()
-        return translated_text
+        subtitle.content = translated_text
+        translated_subtitles.append(subtitle)
 
     # Construct the output file path
     base_name = os.path.splitext(os.path.basename(input_file))[0]
