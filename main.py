@@ -1,18 +1,15 @@
-import os
 import sys
-
+import os
 from Functions import make_dirs, translate_single_srt
 
-# Set up your OpenAI API key
+# Get the OpenAI API key from command line arguments
 api_key = sys.argv[1]
 
 input_folder = "input"  # Folder containing the input .srt files
 output_folder = "output"  # Folder to save translated .srt files
 target_lang = "polish"  # Target language code (e.g., "fr" for French)
 
-
 if __name__ == "__main__":
-
     make_dirs(input_folder, output_folder)
 
     # Assuming you have only one .srt file in the input folder
@@ -23,3 +20,4 @@ if __name__ == "__main__":
         print("Subtitles translated and saved to the", output_folder, "folder.")
     else:
         print("Please ensure there is exactly one .srt file in the input folder.")
+
