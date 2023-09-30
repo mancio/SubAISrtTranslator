@@ -27,7 +27,7 @@ def make_dirs(input_folder, output_folder):
 
 
 # Define a function to translate a single subtitle file using GPT-3.5 Turbo with 4K context
-def translate_single_srt(input_file, output_folder, target_lang, api_key):
+def translate(input_file, output_folder, target_lang, api_key):
     # Initialize the OpenAI API client with the "gpt-3.5-turbo" engine
     openai.api_key = api_key
     current_tokens = 0
