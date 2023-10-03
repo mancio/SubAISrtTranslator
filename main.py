@@ -10,14 +10,15 @@ output_folder = "output"  # Folder to save translated .srt files
 target_lang = "polish"  # Target language code (e.g., "fr" for French)
 
 if __name__ == "__main__":
+
     make_dirs(input_folder, output_folder)
 
     # Assuming you have only one .srt file in the input folder
     input_files = [f for f in os.listdir(input_folder) if f.endswith('.srt')]
-    if len(input_files) == 1:
-        input_file = os.path.join(input_folder, input_files[0])
-        translate(input_file, output_folder, target_lang, api_key)
-        print("Subtitles translated and saved to the", output_folder, "folder.")
-    else:
-        print("Please ensure there is exactly one .srt file in the input folder.")
+    input_file = os.path.join(input_folder, input_files[0])
+
+    translate(input_file, output_folder, target_lang, api_key)
+
+    print("Subtitles translated and saved to the", output_folder, "folder.")
+
 

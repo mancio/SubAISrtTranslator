@@ -10,9 +10,16 @@ MAX_TOKENS_PER_CALL = 3000
 # Translate each subtitle
 translated_subtitles = []
 
+# to split subs
+splitter = '++++'
+
 ai_model = 'gpt-3.5-turbo'
 
 encoding = tiktoken.encoding_for_model(ai_model)
+
+current_tokens = 0
+current_subtitles = []
+user_message = ""  # Initialize an empty user message
 
 
 def count_tokens(text):
@@ -26,20 +33,44 @@ def make_dirs(input_folder, output_folder):
     os.makedirs(output_folder, exist_ok=True)
 
 
+def parse_subs(input_file):
+    # Read the input .srt file
+    with open(input_file, 'r', encoding='utf-8') as file:
+        return list(srt.parse(file.read()))
+
+
+def append_subs(text):
+    # Format the text with '++++' separators
+    formatted_text = text + '\n++++\n'
+    # Return the original text
+    return text
+
+
+def is_too_long():
+    return current_tokens + count_tokens(user_message) > MAX_TOKENS_PER_CALL
+
+
+def reset_count():
+    global user_message
+    global current_tokens
+    user_message = ''
+    current_tokens = 0
+
+
 # Define a function to translate a single subtitle file using GPT-3.5 Turbo with 4K context
 def translate(input_file, output_folder, target_lang, api_key):
     # Initialize the OpenAI API client with the "gpt-3.5-turbo" engine
     openai.api_key = api_key
-    current_tokens = 0
-    current_subtitles = []
-    user_message = ""  # Initialize an empty user message
 
-    # Read the input .srt file
-    with open(input_file, 'r', encoding='utf-8') as file:
-        subtitles = list(srt.parse(file.read()))
+    subtitles = parse_subs(input_file)
 
     for subtitle in subtitles:
-        subtitle_text = subtitle.content
+
+        append_subs(subtitle.content)
+
+        if is_too_long():
+            translate_block()
+            reset_count()
 
         # Check if adding the subtitle to the current user message exceeds the token limit
         if current_tokens + count_tokens(subtitle_text) < MAX_TOKENS_PER_CALL:
