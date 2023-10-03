@@ -18,8 +18,8 @@ ai_model = 'gpt-3.5-turbo'
 encoding = tiktoken.encoding_for_model(ai_model)
 
 current_tokens = 0
-current_subtitles = []
 user_message = ""  # Initialize an empty user message
+translated_text = ""
 
 
 def count_tokens(text):
@@ -40,21 +40,37 @@ def parse_subs(input_file):
 
 
 def append_subs(text):
-    # Format the text with '++++' separators
-    formatted_text = text + '\n++++\n'
-    # Return the original text
-    return text
+    global user_message
+    user_message = text + '\n++++\n'
 
 
-def is_too_long():
+def text_is_too_long():
     return current_tokens + count_tokens(user_message) > MAX_TOKENS_PER_CALL
 
 
 def reset_count():
     global user_message
     global current_tokens
-    user_message = ''
+    user_message = ""
     current_tokens = 0
+
+
+def translate_block(target_lang):
+    system_role = [{'role': 'system', 'content': f'You are a subtitle translator and you need to translate '
+                                                 f'the following subtitles into "{target_lang}" language.'}]
+    user_role = [{'role': 'user', 'content': user_message}]
+
+    if not translated_text:
+        message = system_role + user_role
+    else:
+        message = user_role
+
+    completion = openai.ChatCompletion.create(
+        model=ai_model,
+        messages=message
+    )
+
+    translated_text + completion.choices[0].message.content.strip()
 
 
 # Define a function to translate a single subtitle file using GPT-3.5 Turbo with 4K context
@@ -68,27 +84,12 @@ def translate(input_file, output_folder, target_lang, api_key):
 
         append_subs(subtitle.content)
 
-        if is_too_long():
-            translate_block()
+        if text_is_too_long():
+            translate_block(target_lang)
             reset_count()
 
-        # Check if adding the subtitle to the current user message exceeds the token limit
-        if current_tokens + count_tokens(subtitle_text) < MAX_TOKENS_PER_CALL:
-            # Add the subtitle to the current user message
-            user_message += subtitle_text + '\n'
-            current_tokens += count_tokens(subtitle_text)
-        else:
-            # Translate the current user message
-            translate_and_save_segment(user_message.strip(), current_subtitles, input_file, output_folder, target_lang)
-
-            # Reset the current user message and tokens for the next segment
-            user_message = subtitle_text + '\n'
-            current_subtitles = [subtitle]
-            current_tokens = count_tokens(subtitle_text)
-
-    if current_subtitles:
-        # Translate the remaining subtitles in the last segment
-        translate_and_save_segment(user_message.strip(), current_subtitles, input_file, output_folder, target_lang)
+    if user_message:
+        translate_block(target_lang)
 
 
 def translate_and_save_segment(user_message, subtitles, input_file, output_folder, target_lang):
