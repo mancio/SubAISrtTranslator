@@ -1,11 +1,17 @@
-# Ignore virtual environment
-venv/
+# Ignore input folder
+/input/
 
-# Ignore sub files
-*.srt
-input/
-output/
+# Ignore output folder
+/output/
 
-# intellij stuff
-.idea/
+# Ignore venv folder (virtual environment)
+/venv/
+
+# Ignore IntelliJ IDEA .iml files
 *.iml
+
+# Ignore IntelliJ IDEA .xml files
+*.xml
+
+# Ignore IntelliJ IDEA project directory
+.idea/

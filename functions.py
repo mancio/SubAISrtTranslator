@@ -1,4 +1,3 @@
-import json
 import openai
 import srt
 import os
@@ -11,7 +10,7 @@ MAX_TOKENS_PER_CALL = 3000
 translated_subtitles = []
 
 # to split subs
-splitter = '++++'
+splitter = '\n++++\n'
 
 ai_model = 'gpt-3.5-turbo'
 
@@ -41,11 +40,20 @@ def parse_subs(input_file):
 
 def append_subs(text):
     global user_message
-    user_message = text + '\n++++\n'
+    user_message += text + splitter
+
+
+def split_text_to_array():
+    # Split the input text using the delimiter
+    text_list = translated_text.split(splitter)
+
+    return [text.strip() for text in text_list]
 
 
 def text_is_too_long():
-    return current_tokens + count_tokens(user_message) > MAX_TOKENS_PER_CALL
+    global current_tokens
+    current_tokens += count_tokens(user_message)
+    return current_tokens > MAX_TOKENS_PER_CALL
 
 
 def reset_count():
@@ -55,10 +63,25 @@ def reset_count():
     current_tokens = 0
 
 
+def prepare_path(input_file, output_folder, target_lang):
+    # Construct the output file path
+    base_name = os.path.splitext(os.path.basename(input_file))[0]
+    return os.path.join(output_folder, f"{base_name}_{target_lang.upper()}.srt")
+
+
+def save_output(output_file, subtitles):
+    # Write the translated subtitles to the output .srt file
+    with open(output_file, 'a', encoding='utf-8') as file:
+        file.write(srt.compose(subtitles))
+
+
 def translate_block(target_lang):
+
     system_role = [{'role': 'system', 'content': f'You are a subtitle translator and you need to translate '
                                                  f'the following subtitles into "{target_lang}" language.'}]
     user_role = [{'role': 'user', 'content': user_message}]
+
+    global translated_text
 
     if not translated_text:
         message = system_role + user_role
@@ -70,7 +93,7 @@ def translate_block(target_lang):
         messages=message
     )
 
-    translated_text + completion.choices[0].message.content.strip()
+    translated_text += completion.choices[0].message.content.strip()
 
 
 # Define a function to translate a single subtitle file using GPT-3.5 Turbo with 4K context
@@ -91,40 +114,11 @@ def translate(input_file, output_folder, target_lang, api_key):
     if user_message:
         translate_block(target_lang)
 
-
-def translate_and_save_segment(user_message, subtitles, input_file, output_folder, target_lang):
-    # Construct a user message batch with the system message
-    system_messages = [{'role': 'system', 'content': f'You are a subtitle translator and you need to translate '
-                                                     f'the following subtitles into "{target_lang}" language.'}]
-    user_message = [{'role': 'user', 'content': user_message}]
-    message = system_messages + user_message
-
-    completion = openai.ChatCompletion.create(
-        model=ai_model,
-        messages=message
-    )
-
-    response = completion.choices[0].message.content
-
-    try:
-        response = json.loads(response)['choices'][0]['message']['content']
-    except:
-        print("[] Things went badly!, check results!")
-        pass
-
-    translated_text = response.strip()
-
-    # Split the translated text into individual subtitles
-    translated_subtitles = translated_text.split('\n')
+    text_list = split_text_to_array()
 
     for idx, subtitle in enumerate(subtitles):
-        if idx < len(translated_subtitles):
-            subtitle.content = translated_subtitles[idx]
+        subtitle.content = text_list[idx]
 
-    # Construct the output file path
-    base_name = os.path.splitext(os.path.basename(input_file))[0]
-    output_file = os.path.join(output_folder, f"{base_name}_{target_lang.upper()}.srt")
+    output_file = prepare_path(input_file, output_folder, target_lang)
 
-    # Write the translated subtitles to the output .srt file
-    with open(output_file, 'a', encoding='utf-8') as file:
-        file.write(srt.compose(subtitles))
+    save_output(output_file, subtitles)
