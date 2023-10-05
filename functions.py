@@ -1,28 +1,32 @@
+import concurrent.futures
+import time
+import re
 import openai
 import srt
 import os
 import tiktoken
 
 # Limit for the maximum tokens per API call
-MAX_TOKENS_PER_CALL = 3000
+MAX_TOKENS_PER_CALL = 3500
 
 # Translate each subtitle
 translated_subtitles = []
 
 # to split subs
-splitter = '\n++++\n'
+splitter = '\n\n'
 
-ai_model = 'gpt-3.5-turbo'
+ai_model = 'gpt-4'
 
 encoding = tiktoken.encoding_for_model(ai_model)
 
 current_tokens = 0
-user_message = ""  # Initialize an empty user message
+# user_message = ""  # Initialize an empty user message
 translated_text = ""
+italian_text = ""
 
 
-def count_tokens(text):
-    return len(encoding.encode(text))
+# def count_tokens(text):
+#     return len(encoding.encode(text))
 
 
 def make_dirs(input_folder, output_folder):
@@ -32,35 +36,45 @@ def make_dirs(input_folder, output_folder):
     os.makedirs(output_folder, exist_ok=True)
 
 
+def clean_string(text):
+    # Define a regular expression pattern to match non-standard tags or formats
+    non_standard_pattern = re.compile(r'<[^>]*>')
+
+    # Remove non-standard tags from the input string
+    cleaned_string = non_standard_pattern.sub('', text)
+
+    return cleaned_string
+
+
 def parse_subs(input_file):
     # Read the input .srt file
     with open(input_file, 'r', encoding='utf-8') as file:
         return list(srt.parse(file.read()))
 
 
-def append_subs(text):
-    global user_message
-    user_message += text + splitter
+# def append_subs(text):
+#     global user_message
+#     user_message += splitter + text
 
 
-def split_text_to_array():
-    # Split the input text using the delimiter
-    text_list = translated_text.split(splitter)
-
-    return [text.strip() for text in text_list]
-
-
-def text_is_too_long():
-    global current_tokens
-    current_tokens += count_tokens(user_message)
-    return current_tokens > MAX_TOKENS_PER_CALL
+# def split_text_to_array():
+#     # Split the input text using the delimiter
+#     text_list = translated_text.split(splitter)
+#
+#     return [text.strip() for text in text_list]
 
 
-def reset_count():
-    global user_message
-    global current_tokens
-    user_message = ""
-    current_tokens = 0
+# def text_is_too_long():
+#     global current_tokens
+#     current_tokens += count_tokens(user_message)
+#     return current_tokens > MAX_TOKENS_PER_CALL
+
+
+# def reset_count():
+#     global user_message
+#     global current_tokens
+#     user_message = ""
+#     current_tokens = 0
 
 
 def prepare_path(input_file, output_folder, target_lang):
@@ -75,49 +89,81 @@ def save_output(output_file, subtitles):
         file.write(srt.compose(subtitles))
 
 
-def translate_block(target_lang):
-
-    system_role = [{'role': 'system', 'content': f'You are a subtitle translator and you need to translate '
-                                                 f'the following subtitles into "{target_lang}" language.'}]
-    user_role = [{'role': 'user', 'content': user_message}]
-
-    global translated_text
-
-    if not translated_text:
-        message = system_role + user_role
-    else:
-        message = user_role
-
-    completion = openai.ChatCompletion.create(
+def run_model(message):
+    return openai.ChatCompletion.create(
         model=ai_model,
-        messages=message
+        messages=message,
+        temperature=0,
+        max_tokens=256,
+        top_p=1,
+        frequency_penalty=0,
+        presence_penalty=0
     )
 
-    translated_text += completion.choices[0].message.content.strip()
+
+def translate_subtitle(user_message, input_language, target_lang):
+    system_role = [{'role': 'system', 'content': f'Translate the following subtitle from "{input_language}" to '
+                                                 f'"{target_lang}":'}]
+    user_role = [{'role': 'user', 'content': user_message}]
+
+    # global translated_text
+    #
+    # if not translated_text:
+    message = system_role + user_role
+    # else:
+    #     message = user_role
+
+    # if translated_text:
+    # time.sleep(1)
+
+    completion = run_model(message)
+
+    return completion.choices[0].message.content.strip()
+
+    # global italian_text
+    # italian_text += user_message
+
+
+def translate_concurrent(subtitle, input_language, target_lang):
+    subtitle.content = translate_subtitle(clean_string(subtitle.content), input_language, target_lang)
 
 
 # Define a function to translate a single subtitle file using GPT-3.5 Turbo with 4K context
-def translate(input_file, output_folder, target_lang, api_key):
+def translate(input_file, output_folder, input_language, target_lang, api_key):
     # Initialize the OpenAI API client with the "gpt-3.5-turbo" engine
     openai.api_key = api_key
 
     subtitles = parse_subs(input_file)
 
-    for subtitle in subtitles:
+    # for subtitle in subtitles:
+    #     subtitle.content = translate_subtitle(subtitle.content, input_language, target_lang)
+    #     print("translated Sub number: " + str(subtitle.index) + " on total of " + str(len(subtitles)))
 
-        append_subs(subtitle.content)
+    # Specify the maximum number of threads (adjust as needed)
+    max_threads = 1
 
-        if text_is_too_long():
-            translate_block(target_lang)
-            reset_count()
+    # Create a ThreadPoolExecutor with the specified maximum number of threads
+    with concurrent.futures.ThreadPoolExecutor(max_threads) as executor:
+        # Submit translation tasks for each subtitle
+        translation_tasks = [executor.submit(translate_concurrent, subtitle, input_language, target_lang) for subtitle
+                             in subtitles]
 
-    if user_message:
-        translate_block(target_lang)
+        # Wait for all tasks to complete
+        concurrent.futures.wait(translation_tasks)
 
-    text_list = split_text_to_array()
+        # append_subs(clean_string(subtitle.content))
 
-    for idx, subtitle in enumerate(subtitles):
-        subtitle.content = text_list[idx]
+    #     if text_is_too_long():
+    #         translate_block(input_language, target_lang)
+    #         reset_count()
+    #
+    # if user_message:
+    #     translate_block(input_language, target_lang)
+
+    # text_list = split_text_to_array()
+    #
+    # for idx, subtitle in enumerate(subtitles):
+    #     subtitle.content = text_list[idx]
 
     output_file = prepare_path(input_file, output_folder, target_lang)
 
