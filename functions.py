@@ -127,9 +127,9 @@ def translate_subtitle(user_message, input_language, target_lang):
     # italian_text += user_message
 
 
-def translate_concurrent(subtitle, input_language, target_lang):
+def translate_concurrent(index, subtitle, input_language, target_lang):
     global translated_subtitles
-    translated_subtitles.content = translate_subtitle(clean_string(subtitle.content), input_language, target_lang)
+    translated_subtitles[index].content = translate_subtitle(clean_string(subtitle.content), input_language, target_lang)
 
 
 # Define a function to translate a single subtitle file using GPT-3.5 Turbo with 4K context
@@ -152,8 +152,9 @@ def translate(input_file, output_folder, input_language, target_lang, api_key):
     # Create a ThreadPoolExecutor with the specified maximum number of threads
     with concurrent.futures.ThreadPoolExecutor(max_threads) as executor:
         # Submit translation tasks for each subtitle
-        translation_tasks = [executor.submit(translate_concurrent, subtitle, input_language, target_lang) for subtitle
-                             in subtitles]
+        translation_tasks = [executor.submit(translate_concurrent, index, subtitle, input_language, target_lang)
+                             for index, subtitle
+                             in enumerate(subtitles)]
 
         # Wait for all tasks to complete
         concurrent.futures.wait(translation_tasks)
@@ -174,4 +175,4 @@ def translate(input_file, output_folder, input_language, target_lang, api_key):
 
     output_file = prepare_path(input_file, output_folder, target_lang)
 
-    save_output(output_file, subtitles)
+    save_output(output_file, translated_subtitles)
