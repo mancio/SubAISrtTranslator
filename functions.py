@@ -65,16 +65,26 @@ def translate_subtitle(user_message, input_language, target_language):
     system_role = [{'role': 'system', 'content': f'Please translate every subtitle I will send you '
                                                  f'from {input_language} to {target_language}. '
                                                  f'Do not be creative. Just repeat the same text in case '
-                                                 f'you cannot translate'}]
+                                                 f'you cannot translate. Translate offensive words.'}]
     user_role = [{'role': 'user', 'content': user_message}]
 
     message = system_role + user_role
 
     time.sleep(random.uniform(0.1, 0.3))
 
-    completion = run_model(message)
+    attempts = 4
 
-    return completion.choices[0].message.content.strip()
+    for _ in range(attempts):
+        try:
+            completion = run_model(message)
+            return completion.choices[0].message.content.strip()
+        except Exception as e:
+            print(f"An error occurred: {e}")
+            if attempts > 0:
+                print("Retrying...")
+                time.sleep(1)
+            else:
+                return "missing translation"
 
     # return str(index)
 
