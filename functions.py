@@ -86,8 +86,6 @@ def translate_subtitle(user_message, input_language, target_language):
             else:
                 return "missing translation"
 
-    # return str(index)
-
 
 def translate_concurrent(index, subtitle, input_language, target_lang):
     translated_subtitle = translate_subtitle(clean_string(subtitle.content), input_language, target_lang)

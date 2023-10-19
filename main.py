@@ -8,7 +8,7 @@ api_key = sys.argv[1]
 input_folder = "input"  # Folder containing the input .srt files
 output_folder = "output"  # Folder to save translated .srt files
 input_language = "Italian"
-target_lang = "Polish"  # Target language code (e.g., "fr" for French)
+target_lang = "Polish"
 
 if __name__ == "__main__":
 
